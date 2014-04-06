@@ -4,7 +4,10 @@ import org.joda.time.DateTime;
 import org.sql2o.converters.Convert;
 import org.sql2o.converters.Converter;
 import org.sql2o.converters.ConverterException;
-import org.sql2o.data.*;
+import org.sql2o.data.LazyTable;
+import org.sql2o.data.Row;
+import org.sql2o.data.Table;
+import org.sql2o.data.TableResultSetIterator;
 import org.sql2o.logging.LocalLoggerFactory;
 import org.sql2o.logging.Logger;
 import org.sql2o.reflection.PojoMetadata;
@@ -15,8 +18,8 @@ import org.sql2o.tools.ResultSetUtils;
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.sql.*;
 import java.sql.Date;
+import java.sql.*;
 import java.util.*;
 
 /**
@@ -431,6 +434,10 @@ public class Query {
         return this.connection;
     }
 
+    /**
+     * Use {@link #executeScalar(Class)} instead.
+     */
+    @Deprecated
     public Object executeScalar(){
         long start = System.currentTimeMillis();
         try {
@@ -460,15 +467,35 @@ public class Query {
     }
 
     public <V> V executeScalar(Class<V> returnType){
-        Object value = executeScalar();
-        Converter converter;
+        long start = System.currentTimeMillis();
         try {
-            converter = Convert.getConverter(returnType);
-            return (V)converter.convert(value);
-        } catch (ConverterException e) {
-            throw new Sql2oException("Error occured while converting value from database to type " + returnType.toString(), e);
-        }
+            Converter converter = Convert.getConverter(returnType);
+            ResultSet rs = this.statement.executeQuery();
+            if (rs.next()){
+                Object o = ResultSetUtils.getRSVal(rs, 1);
 
+                long end = System.currentTimeMillis();
+                logger.debug("total: {} ms; executed scalar [{}]", new Object[]{
+                        end - start,
+                        this.getName() == null ? "No name" : this.getName()
+                });
+
+                return (V)converter.convert(o);
+            }
+            else{
+                return null;
+            }
+        }
+        catch (SQLException e) {
+            this.connection.onException();
+            throw new Sql2oException("Database error occurred while running executeScalar: " + e.getMessage(), e);
+        }
+        catch (ConverterException e) {
+            throw new Sql2oException("Error occurred while converting value from database to type " + returnType.toString(), e);
+        }
+        finally{
+            closeConnectionIfNecessary();
+        }
     }
 
     public <T> List<T> executeScalarList(Class<T> returnType){
@@ -569,7 +596,15 @@ public class Query {
         return this;
     }
 
+    /************** async stuff ***************/
+
+    public AsyncExecutor async()
+    {
+        return new AsyncExecutor(getConnection().getSql2o().getExecutorService(), this);
+    }
+
     /************** private stuff ***************/
+
     private void closeConnectionIfNecessary(){
         try{
             if (connection.autoClose && !connection.getJdbcConnection().isClosed() && statement != null){

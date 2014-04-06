@@ -16,6 +16,8 @@ import org.sql2o.tools.IOUtils;
 
 import javax.naming.Context;
 import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.sql.DataSource;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -105,9 +107,35 @@ public class Sql2oTest {
 
         System.out.println("Datasource initialized.");
 
-        Sql2o jndiSql2o = new Sql2o("Sql2o");
+        Sql2o jndiSql2o = new Sql2o(getJndiDataSource("Sql2o"));
 
         assertTrue(jndiSql2o != null);
+    }
+
+    private DataSource getJndiDataSource(String jndiLookup)
+    {
+        Context ctx = null;
+        DataSource datasource = null;
+
+        try {
+            ctx = new InitialContext();
+            datasource = (DataSource) ctx.lookup(jndiLookup);
+        }
+        catch (NamingException e) {
+            throw new RuntimeException(e);
+        }
+        finally {
+            if (ctx != null) {
+                try {
+                    ctx.close();
+                }
+                catch (NamingException ignored) {
+                    // swallow
+                }
+            }
+        }
+
+        return datasource;
     }
 
     @Test

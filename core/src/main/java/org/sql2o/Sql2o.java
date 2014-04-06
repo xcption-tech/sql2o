@@ -1,12 +1,11 @@
 package org.sql2o;
 
-import javax.naming.Context;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
 import javax.sql.DataSource;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 /**
  * Sql2o is the main class for the sql2o library.
@@ -23,35 +22,6 @@ import java.util.Map;
  * @author Lars Aaberg
  */
 public class Sql2o {
-
-    public Sql2o(String jndiLookup) {
-        this(_getJndiDatasource(jndiLookup));
-    }
-
-    private static DataSource _getJndiDatasource(String jndiLookup) {
-        Context ctx = null;
-        DataSource datasource = null;
-
-        try {
-            ctx = new InitialContext();
-            datasource = (DataSource) ctx.lookup(jndiLookup);
-        }
-        catch (NamingException e) {
-            throw new RuntimeException(e);
-        }
-        finally {
-            if (ctx != null) {
-                try {
-                    ctx.close();
-                }
-                catch (NamingException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        }
-
-        return datasource;
-    }
 
     /**
      * Creates a new instance of the Sql2o class. Internally this constructor will create a {@link GenericDatasource},
@@ -92,8 +62,8 @@ public class Sql2o {
     public Sql2o(DataSource dataSource, QuirksMode quirksMode){
         this.dataSource = dataSource;
         this.quirksMode = quirksMode;
-
         this.defaultColumnMappings = new HashMap<String, String>();
+        this.executorService = new ScheduledThreadPoolExecutor(4);
     }
 
     private final DataSource dataSource;
@@ -114,7 +84,7 @@ public class Sql2o {
     /**
      * Gets the default column mappings Map. column mappings added to this Map are always available when Sql2o attempts
      * to map between result sets and object instances.
-     * @return  The {@link Map<String, String>} instance, which Sql2o internally uses to map column names with property
+     * @return The {@link Map<String, String>} instance, which Sql2o internally uses to map column names with property
      * names.
      */
     public Map<String, String> getDefaultColumnMappings() {
@@ -368,4 +338,13 @@ public class Sql2o {
         return (V)result;
     }
 
+    private ExecutorService executorService;
+
+    public ExecutorService getExecutorService() {
+        return executorService;
+    }
+
+    public void setExecutorService(ExecutorService executorService) {
+        this.executorService = executorService;
+    }
 }
