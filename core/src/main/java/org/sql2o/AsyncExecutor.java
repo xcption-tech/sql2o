@@ -9,7 +9,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 /**
- * @author alden@mark43.com
+ * @author aldenquimby@gmail.com
  * @since 4/5/14
  */
 public class AsyncExecutor

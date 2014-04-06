@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.concurrent.*;
 
 /**
- * @author alden@mark43.com
+ * @author aldenquimby@gmail.com
  * @since 4/5/14
  */
 public class AsyncQuery extends Query
