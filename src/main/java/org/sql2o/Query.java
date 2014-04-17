@@ -582,9 +582,18 @@ public class Query {
 
     /************** private stuff ***************/
     private void closeConnectionIfNecessary(){
-        try{
-            if (connection.autoClose && !connection.getJdbcConnection().isClosed() && statement != null){
+        // always close statement
+        if (statement != null) {
+            try {
                 this.statement.close();
+            }
+            catch (SQLException ex) {
+                throw new RuntimeException("Error while attempting to close statement", ex);
+            }
+        }
+        // maybe close connection
+        try{
+            if (connection.autoClose && !connection.getJdbcConnection().isClosed()) {
                 this.connection.getJdbcConnection().close();
             }
         }
