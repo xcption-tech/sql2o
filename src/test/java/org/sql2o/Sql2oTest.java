@@ -145,10 +145,10 @@ public class Sql2oTest {
         Connection connection = sql2o.beginTransaction();
         Query insQuery = connection.createQuery("insert into testExecWithNullsTbl (text, aNumber, aLongNumber) values(:text, :number, :lnum)");
         insQuery.addParameter("text", "some text").addParameter("number", 2).addParameter("lnum", 10L).executeUpdate();
-        insQuery.addParameter("text", "some text").addParameter("number", (Integer)null).addParameter("lnum", 10L).executeUpdate();
-        insQuery.addParameter("text", (String)null).addParameter("number", 21).addParameter("lnum", (Long)null).executeUpdate();
-        insQuery.addParameter("text", "some text").addParameter("number", 1221).addParameter("lnum", 10).executeUpdate();
-        insQuery.addParameter("text", "some text").addParameter("number", 2311).addParameter("lnum", 12).executeUpdate();
+        insQuery.resetStatement().addParameter("text", "some text").addParameter("number", (Integer)null).addParameter("lnum", 10L).executeUpdate();
+        insQuery.resetStatement().addParameter("text", (String)null).addParameter("number", 21).addParameter("lnum", (Long)null).executeUpdate();
+        insQuery.resetStatement().addParameter("text", "some text").addParameter("number", 1221).addParameter("lnum", 10).executeUpdate();
+        insQuery.resetStatement().addParameter("text", "some text").addParameter("number", 2311).addParameter("lnum", 12).executeUpdate();
         connection.commit();
 
         List<Entity> fetched = sql2o.createQuery("select * from testExecWithNullsTbl").executeAndFetch(Entity.class);

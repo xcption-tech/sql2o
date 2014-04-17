@@ -29,15 +29,10 @@ public class Query {
     public Query(Connection connection, String queryText, String name, boolean returnGeneratedKeys) {
         this.connection = connection;
         this.name = name;
+        this.queryText = queryText;
         this.returnGeneratedKeys = returnGeneratedKeys;
 
-        try{
-            statement = new NamedParameterStatement(connection.getJdbcConnection(), queryText, returnGeneratedKeys);
-        }
-        catch(Exception ex){
-            throw new RuntimeException(ex);
-        }
-
+        this.resetStatement();
         this.setColumnMappings(connection.getSql2o().getDefaultColumnMappings());
         this.caseSensitive = connection.getSql2o().isDefaultCaseSensitive();
     }
@@ -53,6 +48,7 @@ public class Query {
     private boolean autoDeriveColumnNames;
 
     private final String name;
+    private String queryText;
     private boolean returnGeneratedKeys;
 
     // ------------------------------------------------
@@ -423,7 +419,7 @@ public class Query {
 
             this.connection.setResult(statement.executeUpdate());
             this.connection.setKeys(this.returnGeneratedKeys ? statement.getStatement().getGeneratedKeys() : null);
-            connection.setCanGetKeys(this.returnGeneratedKeys);
+            this.connection.setCanGetKeys(this.returnGeneratedKeys);
         }
         catch(SQLException ex){
             this.connection.onException();
@@ -580,19 +576,33 @@ public class Query {
         return this;
     }
 
+    /************** reuse query ***************/
+
+    /**
+     * Must be called between statement execution if using Query for multiple statements.
+     */
+    public Query resetStatement() {
+        try {
+            statement = new NamedParameterStatement(connection.getJdbcConnection(), queryText, returnGeneratedKeys);
+        }
+        catch(Exception ex){
+            throw new RuntimeException(ex);
+        }
+        return this;
+    }
+
     /************** private stuff ***************/
+
     private void closeConnectionIfNecessary(){
         // always close statement
-        if (statement != null) {
-            try {
-                this.statement.close();
-            }
-            catch (SQLException ex) {
-                throw new RuntimeException("Error while attempting to close statement", ex);
-            }
+        try {
+            this.statement.close();
+        }
+        catch (SQLException ex) {
+            throw new RuntimeException("Error while attempting to close statement", ex);
         }
         // maybe close connection
-        try{
+        try {
             if (connection.autoClose && !connection.getJdbcConnection().isClosed()) {
                 this.connection.getJdbcConnection().close();
             }
