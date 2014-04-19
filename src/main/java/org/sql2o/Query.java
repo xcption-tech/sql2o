@@ -521,7 +521,7 @@ public class Query {
         return this;
     }
 
-    public Connection executeBatch() throws Sql2oException {
+    public Connection executeBatch() {
         long start = System.currentTimeMillis();
         try {
             connection.setBatchResult(statement.executeBatch());
@@ -585,7 +585,7 @@ public class Query {
         try {
             statement = new NamedParameterStatement(connection.getJdbcConnection(), queryText, returnGeneratedKeys);
         }
-        catch(Exception ex){
+        catch(Exception ex) {
             throw new RuntimeException(ex);
         }
         return this;
@@ -599,8 +599,9 @@ public class Query {
             this.statement.close();
         }
         catch (SQLException ex) {
-            throw new RuntimeException("Error while attempting to close statement", ex);
+            logger.warn("Error while attempting to close statement", ex);
         }
+
         // maybe close connection
         try {
             if (connection.autoClose && !connection.getJdbcConnection().isClosed()) {
@@ -608,7 +609,7 @@ public class Query {
             }
         }
         catch (Exception ex){
-            throw new RuntimeException("Error while attempting to close connection", ex);
+            logger.warn("Error while attempting to close connection", ex);
         }
     }
 }
