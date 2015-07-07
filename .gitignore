@@ -8,3 +8,7 @@ _site/
 
 # OSX
 .DS_Store
+/.project
+/.settings
+/.classpath
+/bin
