@@ -33,8 +33,14 @@ public class Connection implements AutoCloseable {
     
     private boolean rollbackOnException = true;
 
+    private boolean transactionExternallyManaged = true;
+
     public boolean isRollbackOnException() {
         return rollbackOnException;
+    }
+
+    public void setTransactionExternallyManaged(boolean managed) {
+        this.transactionExternallyManaged = managed;
     }
 
     public Connection setRollbackOnException(boolean rollbackOnException) {
@@ -52,8 +58,13 @@ public class Connection implements AutoCloseable {
     }
 
     void onException() {
-        if (isRollbackOnException()) {
-            rollback(this.autoClose);
+        try {
+            boolean autocommitEnabled = jdbcConnection.getAutoCommit();
+            if (isRollbackOnException() && !autocommitEnabled) {
+                rollback(this.autoClose);
+            }
+        } catch (SQLException sqle) {
+            //IGNORE EXCEPTION
         }
     }
 
@@ -112,7 +123,9 @@ public class Connection implements AutoCloseable {
 
     public Connection rollback(boolean closeConnection){
         try {
-            jdbcConnection.rollback();
+            if (!transactionExternallyManaged) {
+                jdbcConnection.rollback();
+            }
         }
         catch (SQLException e) {
             logger.warn("Could not roll back transaction. message: {}", e);
@@ -164,13 +177,19 @@ public class Connection implements AutoCloseable {
     }
 
     void setKeys(ResultSet rs) throws SQLException {
-        if (rs == null){
-            this.keys = null;
-            return;
-        }
-        this.keys = new ArrayList<Object>();
-        while(rs.next()){
-            this.keys.add(rs.getObject(1));
+        try {
+            if (rs == null) {
+                this.keys = null;
+                return;
+            }
+            this.keys = new ArrayList<Object>();
+            while (rs.next()) {
+                this.keys.add(rs.getObject(1));
+            }
+        } finally {
+            if (rs != null) {
+                rs.close();
+            }
         }
     }
 
@@ -274,7 +293,7 @@ public class Connection implements AutoCloseable {
             }
 
             // if in transaction, rollback, otherwise just close
-            if (autoCommit) {
+            if (autoCommit || transactionExternallyManaged) {
                 this.closeJdbcConnection();
             }
             else {
