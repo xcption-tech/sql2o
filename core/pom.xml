@@ -2,7 +2,7 @@
     <modelVersion>4.0.0</modelVersion>
     <artifactId>sql2o</artifactId>
     <packaging>jar</packaging>
-    <version>1.5.5</version>
+    <version>1.5.4.1</version>
     <name>sql2o</name>
     <description>Easy database query library</description>
     <url>http://www.sql2o.org</url>
