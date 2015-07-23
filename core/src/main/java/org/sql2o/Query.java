@@ -541,8 +541,9 @@ public class Query implements AutoCloseable {
 
     public Object executeScalar(){
         long start = System.currentTimeMillis();
+        ResultSet rs = null;
         try {
-            ResultSet rs = this.statement.executeQuery();
+            rs = this.statement.executeQuery();
             if (rs.next()){
                 Object o = getQuirks().getRSVal(rs, 1);
                 long end = System.currentTimeMillis();
@@ -562,6 +563,13 @@ public class Query implements AutoCloseable {
             throw new Sql2oException("Database error occurred while running executeScalar: " + e.getMessage(), e);
         }
         finally{
+            try {
+                if (rs != null && !rs.isClosed()) {
+                    rs.close();
+                }
+            } catch (SQLException sqle) {
+                logger.debug("An error occurred while closing resultset.", sqle);
+            }
             closeConnectionIfNecessary();
         }
 
