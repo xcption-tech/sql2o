@@ -1,5 +1,25 @@
 package org.sql2o;
 
+import static org.sql2o.converters.Convert.throwIfNull;
+
+import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Time;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+
 import org.sql2o.converters.Converter;
 import org.sql2o.converters.ConverterException;
 import org.sql2o.data.LazyTable;
@@ -10,13 +30,6 @@ import org.sql2o.logging.LocalLoggerFactory;
 import org.sql2o.logging.Logger;
 import org.sql2o.quirks.Quirks;
 import org.sql2o.reflection.PojoIntrospector;
-
-import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
-import java.sql.*;
-import java.util.*;
-
-import static org.sql2o.converters.Convert.throwIfNull;
 
 /**
  * Represents a sql2o statement. With sql2o, all statements are instances of the Query class.
@@ -38,6 +51,9 @@ public class Query implements AutoCloseable {
     private final Map<String, List<Integer>> paramNameToIdxMap;
     private final Set<String> addedParameters;
     private final String parsedQuery;
+    
+    
+    private static final String COLON = ":";
 
     private ResultSetHandlerFactoryBuilder resultSetHandlerFactoryBuilder;
 
@@ -68,6 +84,75 @@ public class Query implements AutoCloseable {
         }
         connection.registerStatement(statement);
 
+    }
+
+    public <T> Query(Connection connection, String queryText, String name, Map<String, List<T>> listParamMap) {
+        final List<ListParameter<T>> processedListParams = getProcessedListParams(listParamMap);
+        
+        for (final ListParameter<T> listParameter : processedListParams) {
+            queryText = queryText.replaceAll(COLON + listParameter.getParameterName(), listParameter.getParameterListName());
+        }
+        
+        this.connection = connection;
+        this.name = name;
+        this.returnGeneratedKeys = false;
+        this.setColumnMappings(connection.getSql2o().getDefaultColumnMappings());
+        this.caseSensitive = connection.getSql2o().isDefaultCaseSensitive();
+
+        paramNameToIdxMap = new HashMap<>();
+        addedParameters = new HashSet<>();
+
+        parsedQuery = connection.getSql2o().getQuirks().getSqlParameterParsingStrategy().parseSql(queryText, paramNameToIdxMap);
+        try {
+            if (returnGeneratedKeys) {
+                statement = connection.getJdbcConnection().prepareStatement(parsedQuery, Statement.RETURN_GENERATED_KEYS);
+            } else {
+                statement = connection.getJdbcConnection().prepareStatement(parsedQuery);
+            }
+        } catch (SQLException ex) {
+            throw new Sql2oException(String.format("Error preparing statement - %s", ex.getMessage()), ex);
+        }
+        connection.registerStatement(statement);
+        
+        for (final ListParameter<T> listParameter : processedListParams) {
+            final Map <String, T> paramValueMap = listParameter.getParameterValues();
+            for (final Entry<String, T> paramSet : paramValueMap.entrySet()) {
+                addParameter(paramSet.getKey(), paramSet.getValue());
+            }
+        }
+
+    }
+
+    private <T> List<ListParameter<T>> getProcessedListParams(Map<String, List<T>> listParamMap) {
+        if (listParamMap == null || listParamMap.isEmpty()) {
+            throw new IllegalArgumentException("An error occurred while generating SQL list parameter");
+        }
+
+        final List<ListParameter<T>> processedListParams = new ArrayList<ListParameter<T>>();
+        for (final Entry<String, List<T>> listParamEntry : listParamMap.entrySet()) {
+            final String parameter = listParamEntry.getKey();
+            final ListParameter<T> listParam = buildListParameter(parameter, listParamEntry.getValue());
+            processedListParams.add(listParam);
+        }
+        return processedListParams;
+    }
+
+    private <T> ListParameter<T> buildListParameter(final String parameter, final List<T> paramValues) {
+        final int paramSize = paramValues.size();
+        final ListParameter<T> listParam = new ListParameter<T>();
+        listParam.setParameterName(parameter);
+        final StringBuilder parameterStr = new StringBuilder();
+        for (int index = 0; index < paramSize; index++) {
+            String indexedParam =  parameter + index;
+            parameterStr.append(COLON).append(indexedParam);
+            if (index < (paramSize - 1)) {
+                parameterStr.append(",");
+            }
+            listParam.addParameterValue(indexedParam, paramValues.get(index));
+        }
+        listParam.setParameterListName(parameterStr.toString());
+
+        return listParam;
     }
 
     // ------------------------------------------------
@@ -712,5 +797,39 @@ public class Query implements AutoCloseable {
 
     private interface ParameterSetter{
         void setParameter(int paramIdx) throws SQLException;
+    }
+
+    private class ListParameter<T> {
+
+        private String parameterName;
+
+        private String parameterListName;
+
+        final private Map<String, T> parameterValues = new HashMap<String, T>();
+
+        public String getParameterName() {
+            return parameterName;
+        }
+
+        public void setParameterName(String parameterName) {
+            this.parameterName = parameterName;
+        }
+
+        public String getParameterListName() {
+            return parameterListName;
+        }
+
+        public void setParameterListName(String parameterListName) {
+            this.parameterListName = parameterListName;
+        }
+
+        public Map<String, T> getParameterValues() {
+            return parameterValues;
+        }
+
+        public void addParameterValue(String paramName, T value) {
+            this.parameterValues.put(paramName, value);
+        }
+
     }
 }

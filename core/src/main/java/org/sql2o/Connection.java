@@ -12,6 +12,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.sql2o.converters.Convert.throwIfNull;
@@ -93,9 +94,24 @@ public class Connection implements AutoCloseable {
 
         return new Query(this, queryText, name, returnGeneratedKeys);
     }
+    
+    public <T> Query createQuery(String queryText, Map<String, List<T>> listParamMap){
+        return createQuery(queryText, null, listParamMap);
+    }
+    
+    public <T> Query createQuery(String queryText, String name, Map<String, List<T>> listParamMap){
+        try {
+            if (jdbcConnection.isClosed()){
+                createConnection();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        return new Query(this, queryText, name, listParamMap);
+    }
 
     public Query createQueryWithParams(String queryText, Object... paramValues){
-        Query query = createQuery(queryText, null);
+        Query query = createQuery(queryText, (String)null);
         boolean destroy = true;
         try {
             query.withParams(paramValues);
@@ -110,7 +126,7 @@ public class Connection implements AutoCloseable {
     }
 
     public Query createQuery(String queryText){
-        return createQuery(queryText, null);
+        return createQuery(queryText, (String)null);
     }
 
     public Query createQuery(String queryText, boolean returnGeneratedKeys) {
